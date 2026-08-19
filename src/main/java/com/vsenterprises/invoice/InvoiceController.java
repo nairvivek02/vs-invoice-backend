@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,6 +47,49 @@ public class InvoiceController {
     @GetMapping
     public List<InvoiceEntity> getAllInvoices() {
         return invoiceRepository.findAllByOrderByIdDesc();
+    }
+    
+    // Regenerates the PDF for a previously saved invoice, by its database id
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> getInvoicePdf(@PathVariable Long id) {
+        InvoiceEntity entity = invoiceRepository.findById(id).orElse(null);
+        if (entity == null) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            InvoiceData data = new InvoiceData();
+            data.setInvoiceNo(entity.getInvoiceNo());
+            data.setInvoiceDate(entity.getInvoiceDate());
+            data.setPoNo(entity.getPoNo());
+            data.setPoDate(entity.getPoDate());
+            data.setBillToName(entity.getBillToName());
+            data.setBillToAddress(entity.getBillToAddress());
+            data.setBillToGst(entity.getBillToGst());
+            data.setBillToState(entity.getBillToState());
+            data.setShipToDetails(entity.getShipToDetails());
+            data.setShipToGst(entity.getShipToGst());
+            data.setShipToState(entity.getShipToState());
+
+            List<InvoiceItem> items = entity.getItems().stream().map(ie -> {
+                InvoiceItem item = new InvoiceItem();
+                item.setDescription(ie.getDescription());
+                item.setHsnCode(ie.getHsnCode());
+                item.setUom(ie.getUom());
+                item.setQty(ie.getQty());
+                item.setRate(ie.getRate());
+                return item;
+            }).collect(Collectors.toList());
+            data.setItems(items);
+
+            byte[] pdf = pdfService.generateInvoice(data);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment",
+                    "invoice_" + entity.getInvoiceNo().replace("/", "-") + ".pdf");
+            return ResponseEntity.ok().headers(headers).body(pdf);
+        } catch (DocumentException e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     private void saveInvoiceToDb(InvoiceData data) {
