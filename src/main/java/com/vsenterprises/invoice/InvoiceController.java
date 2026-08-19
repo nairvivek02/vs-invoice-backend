@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -90,6 +91,16 @@ public class InvoiceController {
         } catch (DocumentException e) {
             return ResponseEntity.internalServerError().build();
         }
+    }
+    
+ // Deletes a saved invoice by its database id
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteInvoice(@PathVariable Long id) {
+        if (!invoiceRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        invoiceRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     private void saveInvoiceToDb(InvoiceData data) {
